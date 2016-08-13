@@ -285,7 +285,7 @@ void setup()
   Serial.begin(115200);
   delay(2000);
 
-  debugprint(DEBUG_TRACE, "IHATECATS 0.99.0");
+  debugprint(DEBUG_TRACE, "IHATECATS 0.1.0");
 
   // Setup the LED pin
   pinMode(BOARD_LED_PIN, OUTPUT);
@@ -301,9 +301,12 @@ void setup()
   // Setup the OLED display
   oled.init();
   oled.clearDisplay();
+  oled.println("IHATECATS 0.1.0");
+  oled.println("Reading config...");
+  oled.display();
 
+  // Start SPI and open the SD card
   SPI.begin();
-
   if ( ! SD.begin(SD_SELECT) ) {
     oled.println("No SD card?");
     oled.display();
@@ -312,11 +315,11 @@ void setup()
   }
 
   if ( ! readConfig() ) {
+    oled.println("Bad config file?");
+    oled.display();
     debugprint(DEBUG_ERROR, "HALT: Failed to read config file");
     while(1);
   }
-    
-  oled.setBatteryIcon(true);
 
   updateVbat();
   updateRSSI();
@@ -353,6 +356,7 @@ void loop()
     oled.setConnected(false);
     oled.setRSSI(0);
     oled.setIPAddress(0);
+    oled.refreshIcons();
     oled.clearMsgArea();
     oled.println("Disconnected!");
     oled.println("Connecting...");

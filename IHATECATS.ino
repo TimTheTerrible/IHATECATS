@@ -15,16 +15,6 @@
 #define SD_SELECT                 PB4
 #define VBAT_PIN                  PA1
 
-/*
-
-#define WLAN_SSID                 "dforge"
-#define WLAN_PASS                 "qpwoeiruty"
-
-#define AIO_USERNAME              "TimTheTerrible"
-#define AIO_KEY                   "397b3924e250425eaac3dabfd8786cab"
-
-*/
-
 const size_t bufferlen = 80;
 char wlanSSID[bufferlen];
 char wlanKey[bufferlen];

@@ -113,8 +113,9 @@ bool connectAP()
 
   oled.refreshIcons();
   oled.clearMsgArea();
-  oled.println("Connecting to...");
+  oled.print("SSID: ");
   oled.println(wlanSSID);
+  oled.println("Connecting...");
   oled.display();
 
   // Attempt to connect to the AP
@@ -129,6 +130,8 @@ bool connectAP()
     oled.setIPAddress(ipAddress);
     oled.refreshIcons();
     oled.clearMsgArea();
+    oled.println("Connected!");
+    oled.display();
   }
   else
   {
@@ -181,28 +184,31 @@ bool connectIOT()
 
   // Attempt to connect to a Broker
   oled.clearMsgArea();
+  oled.print("AIO: ");
   oled.println(aioEndpoint);
+  oled.println("Connecting...");
   oled.display();
 
   // Connect to AIO server
   if ( aio.connect() )
   {
     debugprint(DEBUG_TRACE, "Connected!");
+    oled.clearMsgArea();
     oled.println("Connected!");
     oled.display();
+    delay(3000);
+    return true;
   }
   else
   {
     debugprint(DEBUG_ERROR, "Failed to connect!");
+    oled.clearMsgArea();
     oled.print("Failed! Error: ");
     oled.println(aio.errno(), HEX);
     oled.display();
     delay(3000);
-
     return false;
   }
-
-  return true;
 }  
 
 /**************************************************************************/
@@ -330,6 +336,12 @@ void setup()
   // Follow the feeds
   //feedVBAT.follow(aio_vbat_callback);
   //feedRSSI.follow(aio_rssi_callback);
+
+  oled.println("Startup complete!");
+  oled.display();
+  debugprint(DEBUG_INFO, "Startup complete!");
+
+  delay(2500);
 }
 
 /**************************************************************************/
@@ -349,6 +361,7 @@ void loop()
 
     // Update the OLED
     oled.refreshIcons();
+    oled.display();
   }
   else
   {
@@ -359,22 +372,20 @@ void loop()
     oled.refreshIcons();
     oled.clearMsgArea();
     oled.println("Disconnected!");
-    oled.println("Connecting...");
+    oled.println("Re-connecting...");
     oled.display();
 
     // Try to re-connect to WiFi
-    if ( connectAP() ) {
-
-      // Try to re-connect to broker
-      if ( connectIOT() ) {
-        // do something
-      }
-      else {
-        debugprint(DEBUG_ERROR, "Failed to connect IOT broker");
-      }
+    if ( connectAP() && connectIOT() ) {
+      oled.clearMsgArea();
+      oled.print("SSID: ");
+      oled.println(wlanSSID);
+      oled.print("AIO: ");
+      oled.println(aioEndpoint);
+      oled.display();
     }
     else {
-      debugprint(DEBUG_ERROR, "Failed to connect WiFi AP");
+      debugprint(DEBUG_ERROR, "Connection failed!");
     }
   }
 

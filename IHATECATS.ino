@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_VC0706.h>
 #include <Adafruit_FeatherOLED.h>
 #include <Adafruit_FeatherOLED_WiFi.h>
 #include <adafruit_feather.h>
@@ -12,7 +13,8 @@
 #include <IniFile.h>
 #include <debugprint.h>
 
-#define SD_SELECT                 PB4
+#define RELAY_PIN                 PA0
+#define SDCARD_PIN                PB4
 #define VBAT_PIN                  PA1
 
 const size_t bufferlen = 80;
@@ -30,6 +32,8 @@ AdafruitAIOFeedGauge<float>        feedVBAT(&aio, FEED_VBAT);
 AdafruitAIOFeedGauge<float>        feedRSSI (&aio, FEED_RSSI);
 
 Adafruit_FeatherOLED_WiFi  oled = Adafruit_FeatherOLED_WiFi();
+
+Adafruit_VC0706 cam = Adafruit_VC0706(&Serial2);
 
 /**************************************************************************/
 /*!
@@ -282,6 +286,100 @@ void aio_rssi_callback(float value)
 
 /**************************************************************************/
 /*!
+    @briefCheck for motion, capture and store an image, and toggle the relay
+*/
+/**************************************************************************/
+void checkCamera() {
+  if (cam.motionDetected()) {
+
+    Serial.println("Motion!");   
+    cam.setMotionDetect(false);
+
+    // Click the relay...
+    digitalWrite(RELAY_PIN, HIGH);
+    delay(100);
+    digitalWrite(RELAY_PIN, LOW);
+
+    if (! cam.takePicture()) 
+      Serial.println("Failed to snap!");
+    else 
+      Serial.println("Picture taken!");
+  
+    char filename[13];
+    strcpy(filename, "IMAGE00.JPG");
+    for (int i = 0; i < 100; i++) {
+      filename[5] = '0' + i/10;
+      filename[6] = '0' + i%10;
+      // create if does not exist, do not open existing, write, sync after write
+      if (! SD.exists(filename)) {
+        break;
+      }
+    }
+  
+    File imgFile = SD.open(filename, FILE_WRITE);
+    
+    uint16_t jpglen = cam.frameLength();
+    Serial.print(jpglen, DEC);
+    Serial.println(" byte image");
+   
+    Serial.print("Writing image to "); Serial.print(filename);
+    
+    byte wCount = 0; // For counting # of writes
+    while (jpglen > 0) {
+      // read 32 bytes at a time;
+      uint8_t *buffer;
+      uint8_t bytesToRead = min(64, jpglen); // change 32 to 64 for a speedup but may not work with all setups!
+      buffer = cam.readPicture(bytesToRead);
+      imgFile.write(buffer, bytesToRead);
+  
+      if(++wCount >= 32) { // Every 2K, give a little feedback so it doesn't appear locked up
+        Serial.print('.');
+        wCount = 0;
+      }
+      //Serial.print("Read ");  Serial.print(bytesToRead, DEC); Serial.println(" bytes");
+  
+      jpglen -= bytesToRead;
+    }
+    imgFile.close();
+    Serial.println("...Done!");
+    cam.resumeVideo();
+    cam.setMotionDetect(true);
+  }
+}
+
+/**************************************************************************/
+/*!
+    @brief  Attempt to recconect the wifi
+*/
+/**************************************************************************/
+void reconnect()
+{
+  // The connection was lost ... reset the status icons
+  oled.setConnected(false);
+  oled.setRSSI(0);
+  oled.setIPAddress(0);
+  oled.refreshIcons();
+  oled.clearMsgArea();
+  oled.println("Disconnected!");
+  oled.println("Re-connecting...");
+  oled.display();
+
+  // Try to re-connect to WiFi
+  if ( connectAP() && connectIOT() ) {
+    oled.clearMsgArea();
+    oled.print("SSID: ");
+    oled.println(wlanSSID);
+    oled.print("AIO: ");
+    oled.println(aioEndpoint);
+    oled.display();
+  }
+  else {
+    debugprint(DEBUG_ERROR, "Connection failed!");
+  }
+}
+
+/**************************************************************************/
+/*!
     @brief  The setup function runs once when the board comes out of reset
 */
 /**************************************************************************/
@@ -298,8 +396,12 @@ void setup()
   digitalWrite(BOARD_LED_PIN, HIGH);
 
   // Set up the SD card pin
-  pinMode(SD_SELECT, OUTPUT);
-  digitalWrite(SD_SELECT, HIGH);
+  pinMode(SDCARD_PIN, OUTPUT);
+  digitalWrite(SDCARD_PIN, HIGH);
+
+  // Set up the relay pin
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
 
   // Set up the battery sense pin
   pinMode(VBAT_PIN, INPUT_ANALOG);
@@ -313,7 +415,7 @@ void setup()
 
   // Start SPI and open the SD card
   SPI.begin();
-  if ( ! SD.begin(SD_SELECT) ) {
+  if ( ! SD.begin(SDCARD_PIN) ) {
     oled.println("No SD card?");
     oled.display();
     debugprint(DEBUG_ERROR, "HALT: Failed to initialize the SD card!");
@@ -336,6 +438,18 @@ void setup()
   // Follow the feeds
   //feedVBAT.follow(aio_vbat_callback);
   //feedRSSI.follow(aio_rssi_callback);
+
+  // Connect the camera
+  if ( ! cam.begin() ) {
+    oled.println("Cam attached?");
+    oled.display();
+    debugprint(DEBUG_ERROR, "HALT: No camera found");
+    while(1);
+  }
+
+  // Set up the camera
+  cam.setImageSize(VC0706_640x480);
+  cam.setMotionDetect(true);
 
   oled.println("Startup complete!");
   oled.display();
@@ -363,31 +477,12 @@ void loop()
     oled.refreshIcons();
     oled.display();
   }
-  else
-  {
-    // The connection was lost ... reset the status icons
-    oled.setConnected(false);
-    oled.setRSSI(0);
-    oled.setIPAddress(0);
-    oled.refreshIcons();
-    oled.clearMsgArea();
-    oled.println("Disconnected!");
-    oled.println("Re-connecting...");
-    oled.display();
-
-    // Try to re-connect to WiFi
-    if ( connectAP() && connectIOT() ) {
-      oled.clearMsgArea();
-      oled.print("SSID: ");
-      oled.println(wlanSSID);
-      oled.print("AIO: ");
-      oled.println(aioEndpoint);
-      oled.display();
-    }
-    else {
-      debugprint(DEBUG_ERROR, "Connection failed!");
-    }
+  else {
+    reconnect();
   }
+
+  // Check the camera
+  checkCamera();
 
   oled.refreshIcons();
   delay(10000);

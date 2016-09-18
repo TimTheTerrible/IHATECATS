@@ -65,7 +65,7 @@ bool readConfig()
   }
 
   if ( ! ini.getValue("wifi", "ssid", buffer, bufferlen) ) {
-      debugprint(DEBUG_ERROR, "Failed to read WiFi SSID from config file"!);
+      debugprint(DEBUG_ERROR, "Failed to read WiFi SSID from config file!");
       return false;
   }
 
@@ -334,7 +334,7 @@ void checkCamera() {
 
     debugprint(DEBUG_TRACE, "Motion!");
     oled.clearMsgArea();
-    oled.println("Motion detected");
+    oled.println("Motion detected!");
     oled.display();
 
     // Stop motion detection while we work with the camera...
@@ -344,6 +344,9 @@ void checkCamera() {
     digitalWrite(RELAY_PIN, HIGH);
     delay(100);
     digitalWrite(RELAY_PIN, LOW);
+
+    // How fast does a cat react to being sprayed with air?
+    // delay(100);
 
     // Then take a picture...
     if ( ! cam.takePicture() ) {
@@ -364,6 +367,11 @@ void checkCamera() {
         sprintf(filename, "IMG_%4.4d.JPG", ++count);        
       }  while ( SD.exists(filename) );
 
+      char msg[24];
+      sprintf(msg, "Saving %s", filename);
+      oled.println(msg);
+      oled.display();
+
       File imgFile = SD.open(filename, FILE_WRITE);
       
       uint16_t jpglen = cam.frameLength();
@@ -373,6 +381,7 @@ void checkCamera() {
       byte wCount = 0; // For counting # of writes
       while (jpglen > 0) {
         // read 32 bytes at a time;
+        // TODO: where does this memory come from? who allocates it? is it ever freed?
         uint8_t *buffer;
         uint8_t bytesToRead = min(64, jpglen); // change 32 to 64 for a speedup but may not work with all setups!
         buffer = cam.readPicture(bytesToRead);
@@ -389,6 +398,11 @@ void checkCamera() {
       imgFile.close();
       debugprint(DEBUG_TRACE, "Done");
       cam.resumeVideo();
+
+      oled.clearMsgArea();
+      oled.println("Image saved!");
+      oled.println("Waiting...");
+      oled.display();
     }
   }
 

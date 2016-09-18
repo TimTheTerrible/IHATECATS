@@ -14,8 +14,8 @@
 #include <debugprint.h>
 
 #define RELAY_PIN                 PA0
-#define SDCARD_PIN                PB4
 #define VBAT_PIN                  PA1
+#define SDCARD_PIN                PB4
 
 const size_t bufferlen = 80;
 char wlanSSID[bufferlen];
@@ -101,7 +101,7 @@ bool readConfig()
   // Copy the buffer to the AIO Key
   strncpy(aioKey, buffer, bufferlen);
 
-  debugprint(DEBUG_TRACE, "Config file read!");
+  debugprint(DEBUG_TRACE, "Config file read");
   return true;
 }
 
@@ -125,7 +125,7 @@ bool connectAP()
   // Attempt to connect to the AP
   if ( Feather.connect(wlanSSID, wlanKey) )
   {
-    debugprint(DEBUG_TRACE, "Connected!");
+    debugprint(DEBUG_TRACE, "Connected");
 
     int8_t rssi = Feather.RSSI();
     uint32_t ipAddress = Feather.localIP();
@@ -134,7 +134,7 @@ bool connectAP()
     oled.setIPAddress(ipAddress);
     oled.refreshIcons();
     oled.clearMsgArea();
-    oled.println("Connected!");
+    oled.println("Connected");
     oled.display();
   }
   else
@@ -196,9 +196,9 @@ bool connectIOT()
   // Connect to AIO server
   if ( aio.connect() )
   {
-    debugprint(DEBUG_TRACE, "Connected!");
+    debugprint(DEBUG_TRACE, "Connected");
     oled.clearMsgArea();
-    oled.println("Connected!");
+    oled.println("Connected");
     oled.display();
     delay(3000);
     return true;
@@ -290,6 +290,7 @@ void aio_rssi_callback(float value)
 */
 /**************************************************************************/
 void checkCamera() {
+  debugprint(DEBUG_TRACE, "Checking camera...");
   if (cam.motionDetected()) {
 
     Serial.println("Motion!");   
@@ -303,7 +304,7 @@ void checkCamera() {
     if (! cam.takePicture()) 
       Serial.println("Failed to snap!");
     else 
-      Serial.println("Picture taken!");
+      Serial.println("Picture taken");
   
     char filename[13];
     strcpy(filename, "IMAGE00.JPG");
@@ -341,9 +342,12 @@ void checkCamera() {
       jpglen -= bytesToRead;
     }
     imgFile.close();
-    Serial.println("...Done!");
+    Serial.println("...Done");
     cam.resumeVideo();
     cam.setMotionDetect(true);
+  }
+  else {
+    debugprint(DEBUG_TRACE, "No motion detected");
   }
 }
 
@@ -354,13 +358,16 @@ void checkCamera() {
 /**************************************************************************/
 void reconnect()
 {
+  // Stop the camera momentarily...
+  cam.setMotionDetect(false);
+
   // The connection was lost ... reset the status icons
   oled.setConnected(false);
   oled.setRSSI(0);
   oled.setIPAddress(0);
   oled.refreshIcons();
   oled.clearMsgArea();
-  oled.println("Disconnected!");
+  oled.println("Disconnected");
   oled.println("Re-connecting...");
   oled.display();
 
@@ -376,6 +383,8 @@ void reconnect()
   else {
     debugprint(DEBUG_ERROR, "Connection failed!");
   }
+  // Turn the camera back on
+  cam.setMotionDetect(true);
 }
 
 /**************************************************************************/
@@ -446,14 +455,17 @@ void setup()
     debugprint(DEBUG_ERROR, "HALT: No camera found");
     while(1);
   }
+  else {
+    debugprint(DEBUG_TRACE, "Camera connected");
+  }
 
   // Set up the camera
   cam.setImageSize(VC0706_640x480);
   cam.setMotionDetect(true);
 
-  oled.println("Startup complete!");
+  oled.println("Startup complete");
   oled.display();
-  debugprint(DEBUG_INFO, "Startup complete!");
+  debugprint(DEBUG_INFO, "Startup complete");
 
   delay(2500);
 }
@@ -476,15 +488,15 @@ void loop()
     // Update the OLED
     oled.refreshIcons();
     oled.display();
+
+    // Check the camera
+    checkCamera();
   }
   else {
     reconnect();
   }
 
-  // Check the camera
-  checkCamera();
-
   oled.refreshIcons();
-  delay(10000);
+  delay(200);
 }
 

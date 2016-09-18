@@ -54,18 +54,18 @@ bool readConfig()
 
   // Open the config file
   if ( ! ini.open() ) {
-    debugprint(DEBUG_ERROR, "Failed to open config file");
+    debugprint(DEBUG_ERROR, "Failed to open config file!");
     return false;
   }
 
   // Validate the config file
   if ( ! ini.validate(buffer, bufferLen) ) {
-    debugprint(DEBUG_ERROR, "Invalid config file");
+    debugprint(DEBUG_ERROR, "Invalid config file!");
     return false;
   }
 
   if ( ! ini.getValue("wifi", "ssid", buffer, bufferlen) ) {
-      debugprint(DEBUG_ERROR, "Failed to read WiFi SSID from config file");
+      debugprint(DEBUG_ERROR, "Failed to read WiFi SSID from config file"!);
       return false;
   }
 
@@ -73,7 +73,7 @@ bool readConfig()
   strncpy(wlanSSID, buffer, bufferlen);
   
   if ( ! ini.getValue("wifi", "key", buffer, bufferlen) ) {
-    debugprint(DEBUG_ERROR, "Failed to read WiFi key from config file");
+    debugprint(DEBUG_ERROR, "Failed to read WiFi key from config file!");
     return false;
   }
 
@@ -81,7 +81,7 @@ bool readConfig()
   strncpy(wlanKey, buffer, bufferlen);
 
   if ( ! ini.getValue("aio", "endpoint", buffer, bufferlen) ) {
-    debugprint(DEBUG_ERROR, "Failed to read AIO endpoint from config file");
+    debugprint(DEBUG_ERROR, "Failed to read AIO endpoint from config file!");
     return false;
   }
 
@@ -89,7 +89,7 @@ bool readConfig()
   strncpy(aioEndpoint, buffer, bufferlen);
 
   if ( ! ini.getValue("aio", "username", buffer, bufferlen) ) {
-    debugprint(DEBUG_ERROR, "Failed to read AIO username from config file");
+    debugprint(DEBUG_ERROR, "Failed to read AIO username from config file!");
     return false;
   }
 
@@ -97,7 +97,7 @@ bool readConfig()
   strncpy(aioUsername, buffer, bufferlen);
 
   if ( ! ini.getValue("aio", "key", buffer, bufferlen) ) {
-    debugprint(DEBUG_ERROR, "Failed to read AIO key from config file");
+    debugprint(DEBUG_ERROR, "Failed to read AIO key from config file!");
     return false;
   }
 
@@ -169,7 +169,7 @@ bool connectAP()
     }    
     oled.display();
 
-    debugprint(DEBUG_ERROR, "Failed to connect to AP");
+    debugprint(DEBUG_ERROR, "Failed to connect to AP!");
     return false;
   }
 
@@ -333,6 +333,9 @@ void checkCamera() {
   if (cam.motionDetected()) {
 
     debugprint(DEBUG_TRACE, "Motion!");
+    oled.clearMsgArea();
+    oled.println("Motion detected");
+    oled.display();
 
     // Stop motion detection while we work with the camera...
     cam.setMotionDetect(false);
@@ -342,8 +345,14 @@ void checkCamera() {
     delay(100);
     digitalWrite(RELAY_PIN, LOW);
 
-    if (! cam.takePicture()) {
+    // Then take a picture...
+    if ( ! cam.takePicture() ) {
       debugprint(DEBUG_ERROR, "Failed to snap!");
+      oled.clearMsgArea();
+      oled.println("Failed to snap!");
+      oled.println("Check the camera?");
+      oled.display();
+      delay(5000);
     }
     else {
       debugprint(DEBUG_TRACE, "Picture taken");
@@ -434,7 +443,7 @@ void setup()
   if ( ! readConfig() ) {
     oled.println("Bad config file?");
     oled.display();
-    debugprint(DEBUG_ERROR, "HALT: Failed to read config file");
+    debugprint(DEBUG_ERROR, "HALT: Failed to read config file!");
     while(1);
   }
 
@@ -450,9 +459,9 @@ void setup()
 
   // Connect the camera
   if ( ! cam.begin() ) {
-    oled.println("Cam attached?");
+    oled.println("Camera attached?");
     oled.display();
-    debugprint(DEBUG_ERROR, "HALT: No camera found");
+    debugprint(DEBUG_ERROR, "HALT: No camera found!");
     while(1);
   }
   else {

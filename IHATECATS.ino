@@ -348,23 +348,18 @@ void checkCamera() {
     else {
       debugprint(DEBUG_TRACE, "Picture taken");
   
-      char filename[13];
-      strcpy(filename, "IMAGE00.JPG");
-      for (int i = 0; i < 100; i++) {
-        filename[5] = '0' + i/10;
-        filename[6] = '0' + i%10;
-        // create if does not exist, do not open existing, write, sync after write
-        if (! SD.exists(filename)) {
-          break;
-        }
-      }
-    
+      int count = 0;
+      char filename[15];
+
+      do {
+        sprintf(filename, "IMG_%4.4d.JPG", ++count);        
+      }  while ( SD.exists(filename) );
+
       File imgFile = SD.open(filename, FILE_WRITE);
       
       uint16_t jpglen = cam.frameLength();
       debugprint(DEBUG_TRACE, "%d byte image", jpglen);
-     
-      debugprint(DEBUG_TRACE, "Writing image to "); debugprint(DEBUG_TRACE, filename);
+      debugprint(DEBUG_TRACE, "Writing image to %s", filename);
       
       byte wCount = 0; // For counting # of writes
       while (jpglen > 0) {
@@ -378,16 +373,18 @@ void checkCamera() {
           Serial.print('.');
           wCount = 0;
         }
-        //debugprint(DEBUG_TRACE, "Read ");  debugprint(DEBUG_TRACE, bytesToRead, DEC); debugprint(DEBUG_TRACE, " bytes");
+        //debugprint(DEBUG_TRACE, "Read %d bytes", bytesToRead);
     
         jpglen -= bytesToRead;
       }
       imgFile.close();
-      debugprint(DEBUG_TRACE, "...Done");
+      debugprint(DEBUG_TRACE, "Done");
       cam.resumeVideo();
-      cam.setMotionDetect(true);
     }
   }
+
+  // Turn motion detection back on...
+  cam.setMotionDetect(true);
 }
 
 /**************************************************************************/

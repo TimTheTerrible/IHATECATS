@@ -27,6 +27,9 @@ char aioKey[bufferlen];
 #define FEED_VBAT                 "vbat"
 #define FEED_RSSI                 "rssi"
 
+int updateWait = 10000;  // wait 10 seconds between updates
+int updateTime;
+
 AdafruitAIO                        aio("none","none");
 AdafruitAIOFeedGauge<float>        feedVBAT(&aio, FEED_VBAT);
 AdafruitAIOFeedGauge<float>        feedRSSI (&aio, FEED_RSSI);
@@ -217,6 +220,42 @@ bool connectIOT()
 
 /**************************************************************************/
 /*!
+    @brief  Attempt to recconect the wifi
+*/
+/**************************************************************************/
+void reconnect()
+{
+  // Stop the camera momentarily...
+  cam.setMotionDetect(false);
+
+  // The connection was lost ... reset the status icons
+  oled.setConnected(false);
+  oled.setRSSI(0);
+  oled.setIPAddress(0);
+  oled.refreshIcons();
+  oled.clearMsgArea();
+  oled.println("Disconnected");
+  oled.println("Re-connecting...");
+  oled.display();
+
+  // Try to re-connect to WiFi
+  if ( connectAP() && connectIOT() ) {
+    oled.clearMsgArea();
+    oled.print("SSID: ");
+    oled.println(wlanSSID);
+    oled.print("AIO: ");
+    oled.println(aioEndpoint);
+    oled.display();
+  }
+  else {
+    debugprint(DEBUG_ERROR, "Connection failed!");
+  }
+  // Turn the camera back on
+  cam.setMotionDetect(true);
+}
+
+/**************************************************************************/
+/*!
     @brief Update the battery voltage
 */
 /**************************************************************************/
@@ -290,101 +329,65 @@ void aio_rssi_callback(float value)
 */
 /**************************************************************************/
 void checkCamera() {
-  debugprint(DEBUG_TRACE, "Checking camera...");
+
   if (cam.motionDetected()) {
 
-    Serial.println("Motion!");   
+    debugprint(DEBUG_TRACE, "Motion!");
+
+    // Stop motion detection while we work with the camera...
     cam.setMotionDetect(false);
 
-    // Click the relay...
+    // Click the relay to spray some air...
     digitalWrite(RELAY_PIN, HIGH);
     delay(100);
     digitalWrite(RELAY_PIN, LOW);
 
-    if (! cam.takePicture()) 
-      Serial.println("Failed to snap!");
-    else 
-      Serial.println("Picture taken");
-  
-    char filename[13];
-    strcpy(filename, "IMAGE00.JPG");
-    for (int i = 0; i < 100; i++) {
-      filename[5] = '0' + i/10;
-      filename[6] = '0' + i%10;
-      // create if does not exist, do not open existing, write, sync after write
-      if (! SD.exists(filename)) {
-        break;
-      }
+    if (! cam.takePicture()) {
+      debugprint(DEBUG_ERROR, "Failed to snap!");
     }
+    else {
+      debugprint(DEBUG_TRACE, "Picture taken");
   
-    File imgFile = SD.open(filename, FILE_WRITE);
-    
-    uint16_t jpglen = cam.frameLength();
-    Serial.print(jpglen, DEC);
-    Serial.println(" byte image");
-   
-    Serial.print("Writing image to "); Serial.print(filename);
-    
-    byte wCount = 0; // For counting # of writes
-    while (jpglen > 0) {
-      // read 32 bytes at a time;
-      uint8_t *buffer;
-      uint8_t bytesToRead = min(64, jpglen); // change 32 to 64 for a speedup but may not work with all setups!
-      buffer = cam.readPicture(bytesToRead);
-      imgFile.write(buffer, bytesToRead);
-  
-      if(++wCount >= 32) { // Every 2K, give a little feedback so it doesn't appear locked up
-        Serial.print('.');
-        wCount = 0;
+      char filename[13];
+      strcpy(filename, "IMAGE00.JPG");
+      for (int i = 0; i < 100; i++) {
+        filename[5] = '0' + i/10;
+        filename[6] = '0' + i%10;
+        // create if does not exist, do not open existing, write, sync after write
+        if (! SD.exists(filename)) {
+          break;
+        }
       }
-      //Serial.print("Read ");  Serial.print(bytesToRead, DEC); Serial.println(" bytes");
-  
-      jpglen -= bytesToRead;
+    
+      File imgFile = SD.open(filename, FILE_WRITE);
+      
+      uint16_t jpglen = cam.frameLength();
+      debugprint(DEBUG_TRACE, "%d byte image", jpglen);
+     
+      debugprint(DEBUG_TRACE, "Writing image to "); debugprint(DEBUG_TRACE, filename);
+      
+      byte wCount = 0; // For counting # of writes
+      while (jpglen > 0) {
+        // read 32 bytes at a time;
+        uint8_t *buffer;
+        uint8_t bytesToRead = min(64, jpglen); // change 32 to 64 for a speedup but may not work with all setups!
+        buffer = cam.readPicture(bytesToRead);
+        imgFile.write(buffer, bytesToRead);
+    
+        if(++wCount >= 32) { // Every 2K, give a little feedback so it doesn't appear locked up
+          Serial.print('.');
+          wCount = 0;
+        }
+        //debugprint(DEBUG_TRACE, "Read ");  debugprint(DEBUG_TRACE, bytesToRead, DEC); debugprint(DEBUG_TRACE, " bytes");
+    
+        jpglen -= bytesToRead;
+      }
+      imgFile.close();
+      debugprint(DEBUG_TRACE, "...Done");
+      cam.resumeVideo();
+      cam.setMotionDetect(true);
     }
-    imgFile.close();
-    Serial.println("...Done");
-    cam.resumeVideo();
-    cam.setMotionDetect(true);
   }
-  else {
-    debugprint(DEBUG_TRACE, "No motion detected");
-  }
-}
-
-/**************************************************************************/
-/*!
-    @brief  Attempt to recconect the wifi
-*/
-/**************************************************************************/
-void reconnect()
-{
-  // Stop the camera momentarily...
-  cam.setMotionDetect(false);
-
-  // The connection was lost ... reset the status icons
-  oled.setConnected(false);
-  oled.setRSSI(0);
-  oled.setIPAddress(0);
-  oled.refreshIcons();
-  oled.clearMsgArea();
-  oled.println("Disconnected");
-  oled.println("Re-connecting...");
-  oled.display();
-
-  // Try to re-connect to WiFi
-  if ( connectAP() && connectIOT() ) {
-    oled.clearMsgArea();
-    oled.print("SSID: ");
-    oled.println(wlanSSID);
-    oled.print("AIO: ");
-    oled.println(aioEndpoint);
-    oled.display();
-  }
-  else {
-    debugprint(DEBUG_ERROR, "Connection failed!");
-  }
-  // Turn the camera back on
-  cam.setMotionDetect(true);
 }
 
 /**************************************************************************/
@@ -479,16 +482,20 @@ void loop()
 {
   if ( Feather.connected() )
   {
-    // Update the battery level
-    updateVbat();
+    if ( millis() > updateTime ) {
+      // Update the battery level
+      updateVbat();
+  
+      // Update the RSSI level
+      updateRSSI();
+  
+      // Update the OLED
+      oled.refreshIcons();
+      oled.display();
 
-    // Update the RSSI level
-    updateRSSI();
-
-    // Update the OLED
-    oled.refreshIcons();
-    oled.display();
-
+      updateTime = millis() + updateWait;
+    }
+  
     // Check the camera
     checkCamera();
   }
